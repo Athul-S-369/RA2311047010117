@@ -159,7 +159,6 @@ export function normalizeDepotBudgets(raw: unknown, log: AppLogger): DepotBudget
       "mechanicHours",
       "mechanicHourBudget",
       "dailyMechanicHours",
-      "mechanicHours",
       "budgetHours",
       "availableHours",
       "hoursAvailable",
