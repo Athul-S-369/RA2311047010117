@@ -107,12 +107,14 @@ export function selectTopPriorityNotifications(
 
   let pool = items;
   if (unreadOnly) {
-    const filtered = items.filter((n) => n.isRead === false || n.isRead === undefined);
-    if (filtered.length < items.length) {
-      pool = filtered;
-      log.info("Filtered to unread notifications", { count: pool.length });
+    const hasReadFlag = items.some((n) => n.isRead !== undefined);
+    if (hasReadFlag) {
+      pool = items.filter((n) => n.isRead === false);
+      log.info("Filtered to strictly unread notifications", { count: pool.length });
     } else {
-      log.warn("unreadOnly requested but no isRead flags — using full list");
+      log.warn(
+        "Unread-only priority inbox requested but API rows lack isRead; using full feed (cannot infer unread)"
+      );
     }
   }
 

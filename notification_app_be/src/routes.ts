@@ -38,7 +38,10 @@ export function registerNotificationRoutes(app: Express, rootLogger: AppLogger):
 
       const limitRaw = req.query.limit ?? req.query.n;
       const limit = Math.min(100, Math.max(1, Number(limitRaw ?? 10) || 10));
-      const unreadOnly = req.query.unreadOnly === "1" || req.query.unreadOnly === "true";
+      /** Stage 6: priority over *unread* first; pass includeRead=1 to consider read items too. */
+      const includeRead =
+        req.query.includeRead === "1" || req.query.includeRead === "true";
+      const unreadOnly = !includeRead;
 
       explainTopKStrategy(log);
       const top = selectTopPriorityNotifications(all, limit, unreadOnly, log);

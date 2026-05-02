@@ -331,6 +331,8 @@ python priority_inbox.py > ../screenshots/priority_stdout_sample.json
 
 `notification_app_be` Express service: `GET /api/v1/notifications/priority-top` uses **`@affordmed/logging-middleware`** only (Winston-backed), retries in `evaluationHttp.ts`, and returns `{ "notifications": [ { "ID","Type","Message","Timestamp" } ] }`.
 
+By default it ranks **unread** notifications only (Stage 6). If the evaluation API omits `isRead`, the service falls back to the full list and logs a warning. Add query **`includeRead=1`** to include read notifications in ranking.
+
 ## Maintaining top 10 as new items arrive
 
 - **Streaming / unbounded feed:** maintain a **min-heap of size 10** storing the “worst” of the current best; on each new notification, compare with heap root; if better, pop root and push new item — **\(O(\log 10)\)** per arrival.
