@@ -43,18 +43,17 @@ export function registerNotificationRoutes(app: Express, rootLogger: AppLogger):
       explainTopKStrategy(log);
       const top = selectTopPriorityNotifications(all, limit, unreadOnly, log);
 
-      log.info("priority-top response ready", { count: top.length, limit });
+      log.info("priority-top response ready", { count: top.length, limit, unreadOnly });
 
-      res.status(200).json({
-        limit,
-        unreadOnly,
-        notifications: top.map((n) => ({
-          ID: n.ID,
-          Type: n.Type,
-          Message: n.Message,
-          Timestamp: n.Timestamp,
-        })),
-      });
+      type Row = { ID: string; Type: string; Message: string; Timestamp: string };
+      const notifications: Row[] = top.map((n) => ({
+        ID: n.ID,
+        Type: n.Type,
+        Message: n.Message,
+        Timestamp: n.Timestamp,
+      }));
+
+      res.status(200).json({ notifications });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       log.error("priority-top failed", { message });
