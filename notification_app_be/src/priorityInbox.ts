@@ -89,6 +89,8 @@ export function normalizeNotificationsPayload(raw: unknown, log: AppLogger): Nor
 
 /**
  * Stage 6: top `limit` by type weight (Placement > Result > Event), then recency (newer first).
+ * TypeScript path uses sort + slice — O(n log n). For strict heap semantics and large n,
+ * see `python/priority_inbox.py` (`heapq.nlargest`, O(n log k), k=10).
  * Unread-only when `unreadOnly` and `isRead` is present on rows.
  */
 export function selectTopPriorityNotifications(

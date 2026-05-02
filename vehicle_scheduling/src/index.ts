@@ -54,5 +54,6 @@ app.listen(PORT, () => {
     port: PORT,
     healthUrl: `http://localhost:${PORT}/health`,
     scheduleUrl: `http://localhost:${PORT}/api/v1/schedule/optimal`,
+    sampleOutputHint: "vehicle_scheduling/sample_output/example_schedule_response.json",
   });
 });

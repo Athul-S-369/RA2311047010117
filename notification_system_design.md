@@ -79,6 +79,36 @@ Register push token.
 
 **Request:** partial update of channels / muted types.
 
+#### `POST /v1/internal/notifications/push` (server → push vendor)
+
+Dispatches an in-app / mobile push via FCM/APNs (or Web Push) using stored device tokens. Intended for trusted internal callers or job workers (not student-facing raw access).
+
+**Headers:** `Authorization: Bearer <service_token>`, `Content-Type: application/json`, `X-Request-Id: <uuid>`
+
+**Request JSON**
+
+```json
+{
+  "studentIds": [1042, 2201],
+  "title": "Placement",
+  "body": "ACME campus hiring — apply by Friday",
+  "data": { "deeplink": "/placements/42", "notificationId": "uuid" },
+  "priority": "high"
+}
+```
+
+**Response 202**
+
+```json
+{
+  "accepted": 2,
+  "jobId": "queue-job-uuid",
+  "errors": []
+}
+```
+
+The worker fan-out, retries, and vendor responses are tracked separately (see Stage 5).
+
 ---
 
 ## Real-time mechanism
@@ -212,9 +242,23 @@ Fetching all notifications on every page load hammers the DB and hurts UX.
 
 **Recommended:** keyset pagination + partial index + small Redis cache for “first page unread” with TTL 30–60s and invalidation on write.
 
+### Lazy loading
+
+Load only the first viewport of notifications (e.g. 15 rows) and request the next page when the user scrolls. **Trade-off:** more round-trips vs smaller payloads and faster first paint; combine with keyset cursors to avoid duplicates when new rows arrive while scrolling.
+
+### Push-based updates
+
+Prefer **WebSocket/SSE** (Stage 1) so the client receives `notification.created` events and merges into local state instead of polling. **Trade-off:** connection lifecycle complexity vs large reduction in read QPS; always keep a polling fallback for flaky networks.
+
 ---
 
 # Stage 5
+
+## Queue, workers, and retries
+
+- **Queue (Kafka / RabbitMQ / SQS):** decouples producers from delivery; absorbs spikes; enables horizontal scale-out of consumers.
+- **Worker system:** dedicated pools for DB writes, email, and push with independent concurrency limits and circuit breakers.
+- **Retry mechanism:** exponential backoff + dead-letter queues for poison messages; idempotency keys per `(broadcastId, studentId)` to prevent duplicate side effects.
 
 ## Shortcomings of sequential `notify_all`
 
@@ -265,23 +309,58 @@ email_worker(row):
 
 ## Priority inbox (top N)
 
-**Rule:** sort primarily by **type weight** (Placement > Result > Event), secondarily by **recency** (newer `Timestamp` first). Take top **N** (default 10).
+**Rule:** sort primarily by **type weight** (Placement > Result > Event), secondarily by **recency** (newer `Timestamp` first). Take top **10** (configurable).
 
-**Implementation:** see `notification_app_be` — `GET /api/v1/notifications/priority-top` loads data from the **protected** evaluation `GET /notifications` API (no local DB, no hard-coded notifications). All logging uses the **logging middleware** (`req.log` / Winston), not `console.log`.
+### Python implementation (heap / priority queue — required)
+
+Reference: `notification_app_be/python/priority_inbox.py`
+
+- Fetches `GET http://20.207.122.201/evaluation-service/notifications` with `EVALUATION_AUTH_HEADER` (no hard-coded notifications, no DB).
+- Uses **`heapq.nlargest(10, …)`** which implements a binary heap internally — **\(O(n \log k)\)** for \(k=10\), suitable for large \(n\).
+- Logging uses **`StructuredFileLogger`** in `custom_logger.py` — **no** `print` and **no** stdlib `logging` module (parallel to “no built-in loggers” in other languages).
+
+Run:
+
+```bash
+cd notification_app_be/python
+set EVALUATION_AUTH_HEADER=Bearer <token>
+python priority_inbox.py > ../screenshots/priority_stdout_sample.json
+```
+
+### Node/TypeScript mirror (same evaluation API)
+
+`notification_app_be` Express service: `GET /api/v1/notifications/priority-top` uses **`@affordmed/logging-middleware`** only (Winston-backed), retries in `evaluationHttp.ts`, and returns `{ "notifications": [ { "ID","Type","Message","Timestamp" } ] }`.
 
 ## Maintaining top 10 as new items arrive
 
-- **Small streams:** re-run the sort on a bounded in-memory window (e.g. last 10 000 ids) — \(O(n \log n)\).
-- **Large / streaming:** keep a **min-heap of size k** ordered by the same comparator; each insert is \(O(\log k)\); evict root when better item arrives.
-- **Hybrid:** Redis sorted set keyed by composite score + periodic trim to k.
+- **Streaming / unbounded feed:** maintain a **min-heap of size 10** storing the “worst” of the current best; on each new notification, compare with heap root; if better, pop root and push new item — **\(O(\log 10)\)** per arrival.
+- **Micro-batching:** accumulate bursts then run `nlargest` on the batch for simpler code under bursty HR broadcasts.
+- **Hybrid:** Redis sorted set (`ZADD` + periodic `ZREMRANGEBYRANK` to keep top k) for multi-consumer fan-in.
 
 ---
 
 ## Vehicle scheduler (same evaluation constraints)
 
-The **vehicle_scheduling** service (separate folder) loads **only** live data from:
+The **vehicle_scheduling** service loads **only** live data from:
 
 - `GET .../evaluation-service/depots` → `{ "depots": [ { "ID", "MechanicHours" }, ... ] }`
 - `GET .../evaluation-service/vehicles` → `{ "vehicles": [ { "TaskID", "Duration", "Impact", ... } ] }`
 
-It solves **0/1 knapsack** per depot: total **Duration** ≤ **MechanicHours**, maximise **Impact**. No database and no hard-coded tasks. Logging middleware is mandatory throughout.
+It solves **0/1 knapsack DP** per depot: total **Duration** ≤ **MechanicHours**, maximise **Impact**. No database and no hard-coded tasks. **Logging middleware** is used for HTTP retries, merge, DP row progress, and final selection.
+
+**HTTP 200 response shape** (`GET /api/v1/schedule/optimal`):
+
+```json
+{
+  "depots": [
+    {
+      "ID": "1",
+      "selectedTaskIds": ["…"],
+      "totalDuration": 42,
+      "totalImpact": 180
+    }
+  ]
+}
+```
+
+See `vehicle_scheduling/sample_output/example_schedule_response.json` for a documented example.

@@ -1,0 +1,13 @@
+{
+  "depots": [
+    {
+      "ID": "1",
+      "selectedTaskIds": [
+        "264e638f-1c7a-4d67-9f9c-53f3d1766d37",
+        "72a91abc-4ed7-492c-9e99-348e7437953b"
+      ],
+      "totalDuration": 6,
+      "totalImpact": 14
+    }
+  ]
+}

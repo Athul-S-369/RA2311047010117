@@ -1,34 +1,37 @@
 import type { AppLogger } from "@affordmed/logging-middleware";
 
+/** One maintenance task: knapsack weight in capacity units; score = operational impact (Impact). */
 export interface MaintenanceTask {
   id: string;
-  /** Duration as returned in API responses (typically mechanic-hours, whole or fractional) */
   durationHours: number;
-  /** Duration in discrete units (minutes) used as knapsack weight */
   weightUnits: number;
-  /** Operational impact / importance score */
   score: number;
 }
 
 export interface KnapsackResult {
   selectedTaskIds: string[];
-  totalScore: number;
+  /** Sum of Impact scores for selected tasks */
+  totalImpact: number;
+  /** Sum of weight units (same basis as DP capacity) */
   totalWeightUnits: number;
+  /** Sum of Duration (hours) for selected tasks — reportable total duration */
+  totalDurationHours: number;
 }
 
 /**
- * 0/1 knapsack: maximize sum of scores with sum of weights <= capacity.
- * Time O(n × capacity), space O(n × capacity). Capacity is in the same units as task weights
- * (whole hours when API uses integers, else minutes) to stay tractable at scale.
+ * Classic 0/1 knapsack dynamic programming: maximize sum of values with total weight ≤ capacity.
+ * Time Θ(n × W), space Θ(n × W) for this implementation (supports reconstruction).
+ * When W is modest (e.g. mechanic-hours as integers), this scales to large n in practice.
  */
 export function maximizeOperationalImpact(
   tasks: MaintenanceTask[],
   capacityUnits: number,
   log: AppLogger
 ): KnapsackResult {
-  log.info("Starting knapsack optimization", {
+  log.info("Knapsack DP starting", {
     taskCount: tasks.length,
     capacityUnits,
+    algorithm: "0/1-knapsack-dp",
   });
 
   if (tasks.length === 0 || capacityUnits <= 0) {
@@ -36,7 +39,12 @@ export function maximizeOperationalImpact(
       taskCount: tasks.length,
       capacityUnits,
     });
-    return { selectedTaskIds: [], totalScore: 0, totalWeightUnits: 0 };
+    return {
+      selectedTaskIds: [],
+      totalImpact: 0,
+      totalWeightUnits: 0,
+      totalDurationHours: 0,
+    };
   }
 
   const n = tasks.length;
@@ -44,17 +52,15 @@ export function maximizeOperationalImpact(
 
   const cellEstimate = (n + 1) * (W + 1);
   if (cellEstimate > 80_000_000) {
-    log.warn("Knapsack DP is very large — may be slow or memory-heavy", {
-      cellEstimate,
-      taskCount: n,
-      capacityUnits: W,
-    });
+    log.warn("Knapsack DP grid is very large", { cellEstimate, taskCount: n, capacityUnits: W });
   }
 
-  log.debug("Knapsack DP grid allocation", { rows: n + 1, cols: W + 1, cellEstimate });
+  log.info("Knapsack DP table dimensions", { rows: n + 1, cols: W + 1, cellEstimate });
 
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(W + 1).fill(0));
   const take: boolean[][] = Array.from({ length: n + 1 }, () => new Array(W + 1).fill(false));
+
+  const logEveryRows = Math.max(1, Math.floor(n / 10));
 
   for (let i = 1; i <= n; i++) {
     const t = tasks[i - 1];
@@ -74,7 +80,18 @@ export function maximizeOperationalImpact(
         dp[i][w] = skip;
       }
     }
+    if (i % logEveryRows === 0 || i === n) {
+      log.info("Knapsack DP row completed", {
+        itemIndex: i,
+        totalItems: n,
+        bestValueAtFullCapacity: dp[i][W],
+      });
+    }
   }
+
+  log.info("Knapsack DP fill complete; beginning backtrack for selected task IDs", {
+    optimalImpact: dp[n][W],
+  });
 
   const selectedTaskIds: string[] = [];
   let w = W;
@@ -87,22 +104,32 @@ export function maximizeOperationalImpact(
   }
   selectedTaskIds.reverse();
 
-  const totalScore = dp[n][W];
+  let totalDurationHours = 0;
+  for (const id of selectedTaskIds) {
+    const t = tasks.find((x) => x.id === id);
+    if (t) totalDurationHours += t.durationHours;
+  }
+
+  const totalImpact = dp[n][W];
   const totalWeightUnits = selectedTaskIds.reduce((sum, id) => {
     const t = tasks.find((x) => x.id === id);
     return sum + (t?.weightUnits ?? 0);
   }, 0);
 
-  log.info("Knapsack optimization finished", {
+  log.info("Knapsack final selection", {
     selectedCount: selectedTaskIds.length,
-    totalScore,
+    totalImpact,
     totalWeightUnits,
+    totalDurationHours,
     remainingCapacityUnits: W - totalWeightUnits,
+    selectedTaskIdsPreview: selectedTaskIds.slice(0, 50),
+    selectedTaskIdsTruncated: selectedTaskIds.length > 50,
   });
 
   return {
     selectedTaskIds,
-    totalScore,
+    totalImpact,
     totalWeightUnits,
+    totalDurationHours,
   };
 }
