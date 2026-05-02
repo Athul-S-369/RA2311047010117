@@ -360,7 +360,7 @@ python priority_inbox.py > ../screenshots/priority_stdout_sample.json
 
 `notification_app_be` Express service: `GET /api/v1/notifications/priority-top` uses **`@affordmed/logging-middleware`** only (Winston-backed), retries in `evaluationHttp.ts`, and returns `{ "notifications": [ { "ID","Type","Message","Timestamp" } ] }`.
 
-By default it ranks **unread** notifications only (Stage 6). If the evaluation API omits `isRead`, the service falls back to the full list and logs a warning. Add query **`includeRead=1`** to include read notifications in ranking.
+The HTTP handler always applies Stage 6 **unread-first** selection: if `isRead` exists on any row, only `isRead === false` rows are ranked; if the API omits `isRead`, the pool is the full feed (cannot infer read state) and a warning is logged. Query **`limit`** / **`n`** (default **10**, max 100) controls how many rows are returned after sorting by type weight then recency.
 
 ## Maintaining top 10 as new items arrive
 
@@ -372,7 +372,7 @@ By default it ranks **unread** notifications only (Stage 6). If the evaluation A
 
 ## Vehicle scheduler (same evaluation constraints)
 
-The **vehicle_scheduling** service loads **only** live data from:
+The **vehicle_maintence_scheduler** service loads **only** live data from:
 
 - `GET .../evaluation-service/depots` → `{ "depots": [ { "ID", "MechanicHours" }, ... ] }`
 - `GET .../evaluation-service/vehicles` → `{ "vehicles": [ { "TaskID", "Duration", "Impact", ... } ] }`
@@ -394,4 +394,4 @@ It solves **0/1 knapsack DP** per depot: total **Duration** ≤ **MechanicHours*
 }
 ```
 
-See `vehicle_scheduling/sample_output/example_schedule_response.json` for a documented example.
+See `vehicle_maintence_scheduler/sample_output/example_schedule_response.json` for a documented example.

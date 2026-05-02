@@ -6,7 +6,6 @@ export const MINUTES_PER_HOUR = 60;
 export interface NormalizedDepot {
   depotKey: string;
   label: string;
-  /** Knapsack capacity in the same units as `MaintenanceTask.weightUnits` */
   knapsackCapacity: number;
   tasks: MaintenanceTask[];
 }
@@ -107,10 +106,6 @@ function parseVehicleRow(
   };
 }
 
-/**
- * Set `weightUnits` on each task and return knapsack capacity, using whole hours when all
- * values are integral (smaller DP table = faster at scale); otherwise minute granularity.
- */
 export function assignKnapsackWeightsAndCapacity(
   mechanicHours: number,
   tasks: MaintenanceTask[],
@@ -171,7 +166,6 @@ export interface DepotBudgetRow {
   mechanicHours: number;
 }
 
-/** Parse GET /depots: `{ "depots": [ { "ID", "MechanicHours" }, ... ] }` */
 export function normalizeDepotBudgets(raw: unknown, log: AppLogger): DepotBudgetRow[] {
   const list = extractDepotsArray(raw);
   log.info("Normalizing depot budgets", { depotRowCount: list.length });
@@ -238,9 +232,6 @@ function depotKeyMatches(ref: string | undefined, depotKey: string): boolean {
   return String(nRef) === depotKey || ref === String(nKey);
 }
 
-/**
- * Join depot budgets (depots API) with vehicles (vehicles API). No DB, no hard-coded tasks.
- */
 export function mergeDepotsAndVehicles(
   depotsRaw: unknown,
   vehiclesRaw: unknown,

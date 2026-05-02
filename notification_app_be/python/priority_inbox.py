@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-Stage 6 — Priority inbox (Top 10): Placement > Result > Event, then latest Timestamp first.
-
-Uses only the Python standard library (urllib, json, heapq, datetime).
-Fetches GET /evaluation-service/notifications with Authorization from EVALUATION_AUTH_HEADER.
-
-Heap strategy: heapq.nlargest(10, items, key=...) is O(n log k) with k=10 — efficient for large n.
-For streaming top-k: maintain a min-heap of size k (smallest priority among top-k at root).
-"""
 
 from __future__ import annotations
 
@@ -31,7 +22,6 @@ BASE_DELAY_S = 0.4
 
 
 def type_weight(type_raw: str) -> int:
-    """Placement=3, Result=2, Event=1 (Stage 6 contract; see notification_system_design.md)."""
     t = (type_raw or "").strip().lower()
     if t == "placement":
         return 3
@@ -40,6 +30,17 @@ def type_weight(type_raw: str) -> int:
     if t == "event":
         return 1
     return 0
+
+
+def type_for_evaluation_output(type_raw: str) -> str:
+    t = (type_raw or "").strip().lower()
+    if t == "placement":
+        return "Placement"
+    if t == "result":
+        return "Result"
+    if t == "event":
+        return "Event"
+    return type_raw or ""
 
 
 def parse_ts(raw: str) -> float:
@@ -124,7 +125,6 @@ def fetch_notifications(url: str, auth: str, log: StructuredFileLogger) -> Any:
 
 
 def priority_key(n: Notification) -> tuple[int, float]:
-    """nlargest picks greatest key: higher type weight wins, then newer timestamp."""
     return (n.weight, n.ts)
 
 
@@ -161,7 +161,13 @@ def main() -> int:
 
     out = {
         "notifications": [
-            {"ID": n.id, "Type": n.type, "Message": n.message, "Timestamp": n.timestamp} for n in top
+            {
+                "ID": n.id,
+                "Type": type_for_evaluation_output(n.type),
+                "Message": n.message,
+                "Timestamp": n.timestamp,
+            }
+            for n in top
         ]
     }
     json.dump(out, sys.stdout, indent=2)

@@ -18,19 +18,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/**
- * Single GET with structured logging. Throws on non-retryable failure after body read.
- */
 async function fetchOnce(
   log: AppLogger,
   label: string,
   url: string,
   authorizationHeader: string
 ): Promise<{ ok: boolean; status: number; text: string; elapsedMs: number }> {
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    Authorization: authorizationHeader,
-  };
+  const auth = authorizationHeader.trim();
+  if (!auth) {
+    throw new Error("Authorization header value is empty");
+  }
+
+  const headers = new Headers();
+  headers.set("Accept", "application/json");
+  headers.set("Authorization", auth);
 
   const started = Date.now();
   const timeoutMs = Number(process.env.EVALUATION_FETCH_TIMEOUT_MS ?? "60000");
@@ -63,9 +64,6 @@ function isRetryableStatus(status: number): boolean {
   return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
-/**
- * Protected GET with exponential backoff + jitter on transient errors (network / 429 / 5xx).
- */
 async function fetchProtectedJsonWithRetry(
   log: AppLogger,
   label: string,
@@ -149,7 +147,6 @@ async function fetchProtectedJsonWithRetry(
   throw lastError ?? new Error(`${label}: exhausted retries`);
 }
 
-/** GET /depots — protected */
 export async function fetchDepotsPayload(
   log: AppLogger,
   options: FetchProtectedOptions & { url?: string }
@@ -158,7 +155,6 @@ export async function fetchDepotsPayload(
   return fetchProtectedJsonWithRetry(log, "depots", url, options.authorizationHeader);
 }
 
-/** GET /vehicles — protected */
 export async function fetchVehiclesPayload(
   log: AppLogger,
   options: FetchProtectedOptions & { url?: string }
@@ -167,7 +163,6 @@ export async function fetchVehiclesPayload(
   return fetchProtectedJsonWithRetry(log, "vehicles", url, options.authorizationHeader);
 }
 
-/** GET /notifications — protected */
 export async function fetchNotificationsPayload(
   log: AppLogger,
   options: FetchProtectedOptions & { url?: string }

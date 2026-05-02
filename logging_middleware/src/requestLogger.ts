@@ -10,15 +10,10 @@ export interface RequestWithLogger extends Request {
 }
 
 export interface RequestLoggerOptions {
-  /** Parent Winston logger; child loggers attach requestId */
   rootLogger: AppLogger;
-  /** Optional slow-request warning threshold in ms */
   slowRequestMs?: number;
 }
 
-/**
- * Express middleware: assigns a request id, attaches a child logger to req.log, logs request/response metadata.
- */
 export function requestLogger(options: RequestLoggerOptions) {
   const { rootLogger, slowRequestMs = 5000 } = options;
 

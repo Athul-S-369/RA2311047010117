@@ -2,6 +2,10 @@ import type { Express } from "express";
 import type { AppLogger, RequestWithLogger } from "@affordmed/logging-middleware";
 import { fetchNotificationsPayload } from "./notificationsClient";
 import {
+  stringifyNotificationsEvaluationResponse,
+  toEvaluationNotificationJson,
+} from "./evaluationResponse";
+import {
   normalizeNotificationsPayload,
   selectTopPriorityNotifications,
   explainTopKStrategy,
@@ -25,9 +29,6 @@ export function registerNotificationRoutes(app: Express, rootLogger: AppLogger):
     res.json({ status: "ok", service: "notification-app-be" });
   });
 
-  /**
-   * Stage 6: fetch live notifications, return top N by type priority + recency (no DB, no hard-coded list).
-   */
   app.get("/api/v1/notifications/priority-top", async (req, res) => {
     const log = (req as RequestWithLogger).log;
 
@@ -38,25 +39,25 @@ export function registerNotificationRoutes(app: Express, rootLogger: AppLogger):
 
       const limitRaw = req.query.limit ?? req.query.n;
       const limit = Math.min(100, Math.max(1, Number(limitRaw ?? 10) || 10));
-      /** Stage 6: priority over *unread* first; pass includeRead=1 to consider read items too. */
-      const includeRead =
-        req.query.includeRead === "1" || req.query.includeRead === "true";
-      const unreadOnly = !includeRead;
 
       explainTopKStrategy(log);
-      const top = selectTopPriorityNotifications(all, limit, unreadOnly, log);
+      const top = selectTopPriorityNotifications(all, limit, true, log);
 
-      log.info("priority-top response ready", { count: top.length, limit, unreadOnly });
+      log.info("priority-top response ready", { count: top.length, limit, unreadOnly: true });
 
-      type Row = { ID: string; Type: string; Message: string; Timestamp: string };
-      const notifications: Row[] = top.map((n) => ({
-        ID: n.ID,
-        Type: n.Type,
-        Message: n.Message,
-        Timestamp: n.Timestamp,
-      }));
+      const notifications = top.map((n) =>
+        toEvaluationNotificationJson({
+          ID: n.ID,
+          Type: n.Type,
+          Message: n.Message,
+          Timestamp: n.Timestamp,
+        })
+      );
 
-      res.status(200).json({ notifications });
+      res
+        .status(200)
+        .type("application/json")
+        .send(stringifyNotificationsEvaluationResponse(notifications));
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       log.error("priority-top failed", { message });

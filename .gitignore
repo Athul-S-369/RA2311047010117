@@ -1,7 +1,4 @@
-# Legacy duplicate (evaluation deliverable lives in vehicle_scheduling/)
-vehicle_maintence_scheduler/
-
-# Dependencies (Node.js / TypeScript)
+# Node.js / TypeScript
 node_modules/
 
 # Build outputs

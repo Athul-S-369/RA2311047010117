@@ -1,5 +1,5 @@
 {
-  "name": "vehicle-scheduling",
+  "name": "vehicle-maintence-scheduler",
   "version": "1.0.0",
   "private": true,
   "description": "Vehicle maintenance scheduler microservice (knapsack + logging middleware)",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@affordmed/logging-middleware": "file:../logging_middleware",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2"
   },
   "devDependencies": {

@@ -1,3 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
+import { config as loadEnv } from "dotenv";
+
+{
+  const envPath = path.resolve(__dirname, "..", ".env");
+  if (fs.existsSync(envPath)) {
+    loadEnv({ override: true, path: envPath });
+  } else {
+    loadEnv({ override: true });
+  }
+}
+
 import express from "express";
 import {
   createWinstonLogger,
@@ -6,10 +19,9 @@ import {
 } from "@affordmed/logging-middleware";
 import { registerRoutes } from "./routes";
 
-const SERVICE_NAME = "vehicle-scheduling";
+const SERVICE_NAME = "vehicle-maintence-scheduler";
 const PORT = Number(process.env.PORT ?? "3000");
 
-/** File-only logs for evaluation compliance (do not set LOG_CLI for console/stderr sink). */
 const rootLogger = createWinstonLogger({
   serviceName: SERVICE_NAME,
   logDir: process.env.LOG_DIR ?? "logs",
@@ -19,6 +31,7 @@ const rootLogger = createWinstonLogger({
 rootLogger.info("Vehicle scheduling service bootstrapping", {
   port: PORT,
   logSink: "file-only",
+  evaluationAuthConfigured: Boolean(process.env.EVALUATION_AUTH_HEADER?.trim()),
 });
 
 const app = express();
@@ -55,6 +68,6 @@ app.listen(PORT, () => {
     port: PORT,
     healthUrl: `http://localhost:${PORT}/health`,
     scheduleUrl: `http://localhost:${PORT}/api/v1/schedule/optimal`,
-    sampleOutputHint: "vehicle_scheduling/sample_output/example_schedule_response.json",
+    sampleOutputHint: "vehicle_maintence_scheduler/sample_output/example_schedule_response.json",
   });
 });

@@ -1,3 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
+import { config as loadEnv } from "dotenv";
+
+{
+  const envPath = path.resolve(__dirname, "..", ".env");
+  if (fs.existsSync(envPath)) {
+    loadEnv({ override: true, path: envPath });
+  } else {
+    loadEnv({ override: true });
+  }
+}
+
 import express from "express";
 import {
   createWinstonLogger,
@@ -15,7 +28,10 @@ const rootLogger = createWinstonLogger({
   enableCliSink: false,
 });
 
-rootLogger.info("Notification backend bootstrapping", { port: PORT });
+rootLogger.info("Notification backend bootstrapping", {
+  port: PORT,
+  evaluationAuthConfigured: Boolean(process.env.EVALUATION_AUTH_HEADER?.trim()),
+});
 
 const app = express();
 app.use(express.json({ limit: "512kb" }));

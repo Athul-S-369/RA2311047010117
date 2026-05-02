@@ -1,6 +1,5 @@
 import type { AppLogger } from "@affordmed/logging-middleware";
 
-/** One maintenance task: knapsack weight in capacity units; score = operational impact (Impact). */
 export interface MaintenanceTask {
   id: string;
   durationHours: number;
@@ -10,19 +9,11 @@ export interface MaintenanceTask {
 
 export interface KnapsackResult {
   selectedTaskIds: string[];
-  /** Sum of Impact scores for selected tasks */
   totalImpact: number;
-  /** Sum of weight units (same basis as DP capacity) */
   totalWeightUnits: number;
-  /** Sum of Duration (hours) for selected tasks — reportable total duration */
   totalDurationHours: number;
 }
 
-/**
- * Classic 0/1 knapsack dynamic programming: maximize sum of values with total weight ≤ capacity.
- * Time Θ(n × W), space Θ(n × W) for this implementation (supports reconstruction).
- * When W is modest (e.g. mechanic-hours as integers), this scales to large n in practice.
- */
 export function maximizeOperationalImpact(
   tasks: MaintenanceTask[],
   capacityUnits: number,
@@ -93,7 +84,6 @@ export function maximizeOperationalImpact(
     optimalImpact: dp[n][W],
   });
 
-  /** Accumulate totals from the actual row indices taken — `tasks.find(id)` breaks on duplicate TaskIDs. */
   const selectedTaskIds: string[] = [];
   let totalDurationHours = 0;
   let totalWeightUnits = 0;

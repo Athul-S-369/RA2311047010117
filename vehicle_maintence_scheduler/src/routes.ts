@@ -2,6 +2,10 @@ import type { Express } from "express";
 import type { AppLogger, RequestWithLogger } from "@affordmed/logging-middleware";
 import { fetchDepotsPayload, fetchVehiclesPayload } from "./evaluationClient";
 import { mergeDepotsAndVehicles } from "./depotNormalization";
+import {
+  stringifyScheduleEvaluationResponse,
+  toEvaluationDepotScheduleJson,
+} from "./evaluationResponse";
 import { buildOptimalSchedules } from "./scheduleService";
 
 function requireAuthHeader(log: AppLogger): string {
@@ -20,13 +24,9 @@ function requireAuthHeader(log: AppLogger): string {
 export function registerRoutes(app: Express, rootLogger: AppLogger): void {
   app.get("/health", (_req, res) => {
     rootLogger.info("Health check invoked");
-    res.json({ status: "ok", service: "vehicle-scheduling" });
+    res.json({ status: "ok", service: "vehicle-maintence-scheduler" });
   });
 
-  /**
-   * Optimal subset per depot: total Duration ≤ MechanicHours, total Impact maximized (0/1 knapsack).
-   * Data sources: GET /depots and GET /vehicles only (no DB, no hard-coded payloads).
-   */
   app.get("/api/v1/schedule/optimal", async (req, res) => {
     const log = (req as RequestWithLogger).log;
 
@@ -50,7 +50,6 @@ export function registerRoutes(app: Express, rootLogger: AppLogger): void {
         log.warn("No depots after merge");
         return res.status(502).json({
           error: "No depots could be built from evaluation API responses",
-          hint: "Check JSON shapes and EVALUATION_AUTH_HEADER",
         });
       }
 
@@ -59,7 +58,7 @@ export function registerRoutes(app: Express, rootLogger: AppLogger): void {
 
       if (depotFilter && filtered.length === 0) {
         log.warn("depotId filter matched nothing", { depotFilter });
-        return res.status(404).json({ error: "Depot not found", depotId: depotFilter });
+        return res.status(404).json({ error: "Depot not found" });
       }
 
       const depotsOut = buildOptimalSchedules(filtered, log);
@@ -69,7 +68,10 @@ export function registerRoutes(app: Express, rootLogger: AppLogger): void {
         totalSelectedTasks: depotsOut.reduce((s, d) => s + d.selectedTaskIds.length, 0),
       });
 
-      res.status(200).json({ depots: depotsOut });
+      const payload = stringifyScheduleEvaluationResponse(
+        depotsOut.map(toEvaluationDepotScheduleJson)
+      );
+      res.status(200).type("application/json").send(payload);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       log.error("Schedule endpoint failed", { message });

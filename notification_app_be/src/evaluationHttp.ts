@@ -11,7 +11,6 @@ function isRetryableStatus(status: number): boolean {
   return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
-/** GET JSON with retries, logging, and exponential backoff (evaluation-grade resilience). */
 export async function fetchJsonGetWithRetry(
   log: AppLogger,
   label: string,
@@ -24,11 +23,19 @@ export async function fetchJsonGetWithRetry(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     log.info(`${label} fetch attempt`, { attempt, maxAttempts });
     try {
+      const auth = authorizationHeader.trim();
+      if (!auth) {
+        throw new Error("Authorization header value is empty");
+      }
+      const headers = new Headers();
+      headers.set("Accept", "application/json");
+      headers.set("Authorization", auth);
+
       const started = Date.now();
       const timeoutMs = Number(process.env.EVALUATION_FETCH_TIMEOUT_MS ?? "60000");
       const res = await fetch(url, {
         method: "GET",
-        headers: { Accept: "application/json", Authorization: authorizationHeader },
+        headers,
         signal: AbortSignal.timeout(timeoutMs),
       });
       const text = await res.text();

@@ -1,5 +1,8 @@
 # AffordMed Evaluation — Backend Submission
 
+Athul S RA2311047010117
+
+
 Production-oriented implementation for the **Vehicle Maintenance Scheduler** (Part 1) and **Campus Notifications** design + **Stage 6 priority inbox** (Part 2). All runtime telemetry uses the custom **`logging_middleware`** (Winston → structured files under `logs/`). **No `console.log`** in application services.
 
 ---
@@ -9,7 +12,7 @@ Production-oriented implementation for the **Vehicle Maintenance Scheduler** (Pa
 | Area | Location | Role |
 |------|----------|------|
 | **Logging middleware** | `logging_middleware/` | Shared Winston logger + Express `requestLogger` (`req.log`, request IDs). |
-| **Vehicle scheduler** | `vehicle_scheduling/` | Fetches live **depots** + **vehicles** from the evaluation host, runs **0/1 knapsack** per depot, returns optimal schedules. |
+| **Vehicle scheduler** | `vehicle_maintence_scheduler/` | Fetches live **depots** + **vehicles** from the evaluation host, runs **0/1 knapsack** per depot, returns optimal schedules. |
 | **Notifications (API + Stage 6)** | `notification_app_be/` | Express service: priority inbox from live **notifications** API; Python reference in `notification_app_be/python/`. |
 | **Design document** | `notification_system_design.md` | Stages **1–6** (REST, DB, query tuning, performance, reliability, priority inbox). |
 
@@ -59,27 +62,27 @@ Production-oriented implementation for the **Vehicle Maintenance Scheduler** (Pa
 
 - **Middleware:** Every HTTP request gets `req.log` (child logger + `x-request-id`).
 - **Files:** `logs/<service>-combined.log`, `logs/<service>-error.log` (per service working directory).
-- **Console/stderr:** **Disabled** in `vehicle_scheduling` and `notification_app_be` (`enableCliSink: false`) so reviewers only inspect **log files** (evaluation compliance).
+- **Console/stderr:** **Disabled** in `vehicle_maintence_scheduler` and `notification_app_be` (`enableCliSink: false`) so reviewers only inspect **log files** (evaluation compliance).
 
 ### Sample log snippets (illustrative — from Winston JSON file sink)
 
 **API retry / backoff**
 
 ```json
-{"level":"info","message":"depots attempt","service":"vehicle-scheduling","attempt":2,"maxAttempts":4}
-{"level":"info","message":"depots backing off before retry","service":"vehicle-scheduling","delayMs":1000,"nextAttempt":3}
+{"level":"info","message":"depots attempt","service":"vehicle-maintence-scheduler","attempt":2,"maxAttempts":4}
+{"level":"info","message":"depots backing off before retry","service":"vehicle-maintence-scheduler","delayMs":1000,"nextAttempt":3}
 ```
 
 **DP progress**
 
 ```json
-{"level":"info","message":"Knapsack DP row completed","service":"vehicle-scheduling","itemIndex":500,"totalItems":2000,"bestValueAtFullCapacity":842}
+{"level":"info","message":"Knapsack DP row completed","service":"vehicle-maintence-scheduler","itemIndex":500,"totalItems":2000,"bestValueAtFullCapacity":842}
 ```
 
 **Final selection**
 
 ```json
-{"level":"info","message":"Knapsack final selection","service":"vehicle-scheduling","selectedCount":12,"totalImpact":240,"totalWeightUnits":58,"totalDurationHours":58,"remainingCapacityUnits":2}
+{"level":"info","message":"Knapsack final selection","service":"vehicle-maintence-scheduler","selectedCount":12,"totalImpact":240,"totalWeightUnits":58,"totalDurationHours":58,"remainingCapacityUnits":2}
 ```
 
 ---
@@ -108,7 +111,7 @@ Optional:
 ### Vehicle scheduler (port 3000)
 
 ```powershell
-cd vehicle_scheduling
+cd vehicle_maintence_scheduler
 npm install
 npm run build
 npm start
@@ -132,7 +135,7 @@ npm start
 ### Unit tests (vehicle knapsack)
 
 ```powershell
-cd vehicle_scheduling
+cd vehicle_maintence_scheduler
 npm install
 npm test
 ```
@@ -154,11 +157,12 @@ AFFORMEDS/
 ├── README.md                          ← This file
 ├── .gitignore
 ├── logging_middleware/                ← Shared Winston + Express request logger
-├── vehicle_scheduling/
+├── vehicle_maintence_scheduler/
 │   ├── src/                           ← API client, merge, knapsack, routes, tests
 │   ├── sample_output/                 ← Example JSON response
 │   ├── screenshots/                   ← Your vehicle run screenshots
 │   └── logs/                          ← Generated at runtime (gitignored)
+├── vehicle_scheduling/                ← Name used in evaluation brief; points to vehicle_maintence_scheduler
 ├── notification_app_be/
 │   ├── src/
 │   ├── python/                        ← Stage 6 heap reference implementation
@@ -188,7 +192,7 @@ AFFORMEDS/
 
 ### Vehicle — `GET /api/v1/schedule/optimal` (200)
 
-See also `vehicle_scheduling/sample_output/example_schedule_response.json`.
+See also `vehicle_maintence_scheduler/sample_output/example_schedule_response.json`.
 
 ```json
 {
@@ -228,7 +232,7 @@ See also `vehicle_scheduling/sample_output/example_schedule_response.json`.
 | **Negative duration or impact** | Row skipped. |
 | **Duplicate `TaskID`** | Treated as **separate** knapsack items; totals use **selected indices** (correct sums). Response may list the same `TaskID` string twice if both rows are chosen. |
 | **Vehicles without `DepotID`**, multiple depots | Documented merge rules in code comments + logs (may assign full list per depot or sole-depot fallback). |
-| **Unread-only priority (Stage 6)** | Default: unread if `isRead` exists on any row; else full feed + warning. `?includeRead=1` to include read. |
+| **Unread-only priority (Stage 6)** | Unread only when `isRead` is present on rows; else full feed + warning. Default **`limit`** = **10**. |
 
 ---
 

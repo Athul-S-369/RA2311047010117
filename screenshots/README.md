@@ -1,6 +1,6 @@
 # Evaluation screenshots checklist
 
-Capture these for the **vehicle** and **notification** tracks. Store vehicle-related images under `vehicle_scheduling/screenshots/` and notification-related under `notification_app_be/screenshots/` (or copy all here for a single zip).
+Capture these for the **vehicle** and **notification** tracks. Store vehicle-related images under `vehicle_maintence_scheduler/screenshots/` and notification-related under `notification_app_be/screenshots/` (or copy all here for a single zip).
 
 ## 1. Successful API response
 
@@ -13,7 +13,7 @@ Capture these for the **vehicle** and **notification** tracks. Store vehicle-rel
 
 ## 2. Logs showing retries
 
-- Open `vehicle_scheduling/logs/vehicle-scheduling-combined.log` (or notification service equivalent).
+- Open `vehicle_maintence_scheduler/logs/vehicle-maintence-scheduler-combined.log` (or notification service equivalent).
 - Include lines showing **`attempt`**, **`backing off before retry`**, or **`non-success status`** followed by a later successful **`HTTP response`** (after using a valid token, or redact secrets).
 
 ## 3. Logs showing DP progress

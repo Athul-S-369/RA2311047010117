@@ -13,18 +13,11 @@ function ensureLogDir(logDir: string): void {
 export type AppLogger = winston.Logger;
 
 export interface CreateLoggerOptions {
-  /** Directory for log files (default: ./logs) */
   logDir?: string;
-  /** Service name included in every log line */
   serviceName?: string;
-  /** If true, also write human-readable lines to stderr via Winston (still not console.log in app code) */
   enableCliSink?: boolean;
 }
 
-/**
- * Creates the shared Winston logger used across the app. Application code must obtain loggers
- * from createWinstonLogger or request-scoped child loggers — not console or built-in loggers.
- */
 export function createWinstonLogger(options: CreateLoggerOptions = {}): AppLogger {
   const logDir = path.resolve(options.logDir ?? "logs");
   ensureLogDir(logDir);

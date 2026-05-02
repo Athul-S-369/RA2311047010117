@@ -1,8 +1,3 @@
-"""
-Structured file logging without Python's stdlib `logging` module (evaluation constraint:
-no built-in logging libraries). Append-only JSON lines for auditability.
-"""
-
 from __future__ import annotations
 
 import json
@@ -12,7 +7,6 @@ from typing import Any, Mapping
 
 
 class StructuredFileLogger:
-    """Minimal production-style logger: JSON lines to logs/<service>-combined.log"""
 
     def __init__(self, service: str, log_dir: str = "logs") -> None:
         self.service = service

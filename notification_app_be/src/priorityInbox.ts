@@ -5,11 +5,8 @@ export interface NormalizedNotification {
   Type: string;
   Message: string;
   Timestamp: string;
-  /** ms since epoch for sorting */
   timestampMs: number;
-  /** Placement > Result > Event */
   typeRank: number;
-  /** true if API provided read flag */
   isRead?: boolean;
 }
 
@@ -22,7 +19,6 @@ function pickString(o: Record<string, unknown>, keys: string[]): string | undefi
   return undefined;
 }
 
-/** Stage 6 weights: Placement = 3, Result = 2, Event = 1 (see notification_system_design.md). */
 function typeRank(typeRaw: string | undefined): number {
   const t = (typeRaw ?? "").trim().toLowerCase();
   if (t === "placement") return 3;
@@ -88,12 +84,6 @@ export function normalizeNotificationsPayload(raw: unknown, log: AppLogger): Nor
   return out;
 }
 
-/**
- * Stage 6: top `limit` by type weight (Placement > Result > Event), then recency (newer first).
- * TypeScript path uses sort + slice — O(n log n). For strict heap semantics and large n,
- * see `python/priority_inbox.py` (`heapq.nlargest`, O(n log k), k=10).
- * Unread-only when `unreadOnly` and `isRead` is present on rows.
- */
 export function selectTopPriorityNotifications(
   items: NormalizedNotification[],
   limit: number,
@@ -129,11 +119,6 @@ export function selectTopPriorityNotifications(
   return top;
 }
 
-/**
- * Maintaining top-k as new items arrive: use a min-heap of size k keyed by (typeRank, time)
- * or periodic re-sort — for bounded k, re-running this selection over a sliding in-memory window
- * is O(n log n) and acceptable; at very large n use heap of size k (O(n log k)).
- */
 export function explainTopKStrategy(log: AppLogger): void {
   log.info("Top-k maintenance strategy", {
     approach:
