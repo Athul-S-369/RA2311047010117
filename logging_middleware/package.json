@@ -1,0 +1,24 @@
+{
+  "name": "@affordmed/logging-middleware",
+  "version": "1.0.0",
+  "description": "Express logging middleware (structured logs via Winston; app code must use this, not console).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "uuid": "^11.0.3",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "express": "^4.21.0"
+  }
+}

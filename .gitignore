@@ -1,0 +1,26 @@
+# Legacy folder name (remove locally if empty; IDE may lock the path)
+vehicle_scheduling/
+
+# Dependencies (Node.js / TypeScript)
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Logs and runtime
+logs/
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
