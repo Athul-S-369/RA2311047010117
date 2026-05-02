@@ -33,9 +33,14 @@ async function fetchOnce(
   };
 
   const started = Date.now();
+  const timeoutMs = Number(process.env.EVALUATION_FETCH_TIMEOUT_MS ?? "60000");
   let res: Response;
   try {
-    res = await fetch(url, { method: "GET", headers });
+    res = await fetch(url, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch (err) {
     const elapsedMs = Date.now() - started;
     log.error(`${label} transport error`, {
@@ -55,7 +60,7 @@ async function fetchOnce(
 }
 
 function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 502 || status === 503 || status === 504;
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
 /**
@@ -117,12 +122,15 @@ async function fetchProtectedJsonWithRetry(
       throw new Error(`${label} API error: HTTP ${status}`);
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
+      const nm = lastError.message.toLowerCase();
       const retryable =
         attempt < maxAttempts &&
-        (lastError.message.includes("fetch") ||
-          lastError.message.includes("network") ||
-          lastError.message.includes("ECONNRESET") ||
-          lastError.message.includes("ETIMEDOUT"));
+        (nm.includes("fetch") ||
+          nm.includes("network") ||
+          nm.includes("econnreset") ||
+          nm.includes("etimedout") ||
+          nm.includes("abort") ||
+          nm.includes("timeout"));
 
       if (retryable) {
         const delay = BASE_DELAY_MS * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);

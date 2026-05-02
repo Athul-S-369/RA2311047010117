@@ -93,28 +93,23 @@ export function maximizeOperationalImpact(
     optimalImpact: dp[n][W],
   });
 
+  /** Accumulate totals from the actual row indices taken — `tasks.find(id)` breaks on duplicate TaskIDs. */
   const selectedTaskIds: string[] = [];
+  let totalDurationHours = 0;
+  let totalWeightUnits = 0;
   let w = W;
   for (let i = n; i >= 1; i--) {
     if (take[i][w]) {
       const t = tasks[i - 1];
       selectedTaskIds.push(t.id);
+      totalDurationHours += t.durationHours;
+      totalWeightUnits += t.weightUnits;
       w -= t.weightUnits;
     }
   }
   selectedTaskIds.reverse();
 
-  let totalDurationHours = 0;
-  for (const id of selectedTaskIds) {
-    const t = tasks.find((x) => x.id === id);
-    if (t) totalDurationHours += t.durationHours;
-  }
-
   const totalImpact = dp[n][W];
-  const totalWeightUnits = selectedTaskIds.reduce((sum, id) => {
-    const t = tasks.find((x) => x.id === id);
-    return sum + (t?.weightUnits ?? 0);
-  }, 0);
 
   log.info("Knapsack final selection", {
     selectedCount: selectedTaskIds.length,
