@@ -206,6 +206,15 @@ The query is **logically correct** for “all unread for student 1042, newest fi
 - Select only needed columns.
 - **Likely cost**: index build is \(O(n \log n)\) once; steady-state read becomes index range scan + ordered retrieval — roughly **O(k + log n)** for k returned rows instead of **O(N)** table scan.
 
+### Recommended composite index (filter + sort)
+
+```sql
+CREATE INDEX CONCURRENTLY idx_notifications_student_read_created_desc
+  ON notifications (student_id, is_read, created_at DESC);
+```
+
+Align physical column names with your ORM (`studentID` / `isRead` / `createdAt` vs snake_case).
+
 ## “Index every column” — is it effective?
 
 **No.** Extra indexes slow inserts/updates, increase storage, and confuse the planner. Indexes should match **actual predicates and sort orders**. Too many overlapping indexes can cause **worse** plans.
@@ -260,6 +269,15 @@ Prefer **WebSocket/SSE** (Stage 1) so the client receives `notification.created`
 - **Worker system:** dedicated pools for DB writes, email, and push with independent concurrency limits and circuit breakers.
 - **Retry mechanism:** exponential backoff + dead-letter queues for poison messages; idempotency keys per `(broadcastId, studentId)` to prevent duplicate side effects.
 
+### Outbox pattern, delivery semantics, and DLQ
+
+| Concept | Role |
+|---------|------|
+| **Transactional outbox** | Persist “intent to notify” in the same DB transaction as the canonical notification row (or outbox table); workers read outbox and call email/push vendors. Avoids “email sent but DB insert lost” split-brain. |
+| **At-least-once delivery** | Workers may retry; consumers must tolerate duplicates using **idempotency keys** (`notification_id`, `(broadcast_id, student_id)`, dedupe window). |
+| **Idempotency** | Unique constraints + `ON CONFLICT DO NOTHING` / upsert on `(broadcast_id, student_id)` before enqueueing side effects. |
+| **Retry + DLQ** | Bounded retries with exponential backoff; after max attempts move message to a **dead-letter queue/topic** for manual replay or compensating action — prevents poison messages from blocking the partition. |
+
 ## Shortcomings of sequential `notify_all`
 
 - **No batching / concurrency control** — one slow email blocks the rest.
@@ -311,6 +329,17 @@ email_worker(row):
 
 **Rule:** sort primarily by **type weight** (Placement > Result > Event), secondarily by **recency** (newer `Timestamp` first). Take top **10** (configurable).
 
+### Explicit type weights (implementation contract)
+
+| Type | Weight |
+|------|--------|
+| **Placement** | **3** |
+| **Result** | **2** |
+| **Event** | **1** |
+| Other / unknown | **0** |
+
+Secondary key: **larger `Timestamp` (newer) wins** within the same type tier.
+
 ### Python implementation (heap / priority queue — required)
 
 Reference: `notification_app_be/python/priority_inbox.py`
@@ -356,7 +385,7 @@ It solves **0/1 knapsack DP** per depot: total **Duration** ≤ **MechanicHours*
 {
   "depots": [
     {
-      "ID": "1",
+      "ID": 1,
       "selectedTaskIds": ["…"],
       "totalDuration": 42,
       "totalImpact": 180

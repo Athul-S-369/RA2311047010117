@@ -9,15 +9,16 @@ import { registerRoutes } from "./routes";
 const SERVICE_NAME = "vehicle-scheduling";
 const PORT = Number(process.env.PORT ?? "3000");
 
+/** File-only logs for evaluation compliance (do not set LOG_CLI for console/stderr sink). */
 const rootLogger = createWinstonLogger({
   serviceName: SERVICE_NAME,
   logDir: process.env.LOG_DIR ?? "logs",
-  enableCliSink: process.env.LOG_CLI === "1" || process.env.LOG_CLI === "true",
+  enableCliSink: false,
 });
 
 rootLogger.info("Vehicle scheduling service bootstrapping", {
   port: PORT,
-  logCli: process.env.LOG_CLI === "1" || process.env.LOG_CLI === "true",
+  logSink: "file-only",
 });
 
 const app = express();

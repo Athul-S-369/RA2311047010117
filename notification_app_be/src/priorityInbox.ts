@@ -22,6 +22,7 @@ function pickString(o: Record<string, unknown>, keys: string[]): string | undefi
   return undefined;
 }
 
+/** Stage 6 weights: Placement = 3, Result = 2, Event = 1 (see notification_system_design.md). */
 function typeRank(typeRaw: string | undefined): number {
   const t = (typeRaw ?? "").trim().toLowerCase();
   if (t === "placement") return 3;

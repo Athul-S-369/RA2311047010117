@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT ?? "3001");
 const rootLogger = createWinstonLogger({
   serviceName: SERVICE_NAME,
   logDir: process.env.LOG_DIR ?? "logs",
-  enableCliSink: process.env.LOG_CLI === "1" || process.env.LOG_CLI === "true",
+  enableCliSink: false,
 });
 
 rootLogger.info("Notification backend bootstrapping", { port: PORT });

@@ -31,6 +31,7 @@ BASE_DELAY_S = 0.4
 
 
 def type_weight(type_raw: str) -> int:
+    """Placement=3, Result=2, Event=1 (Stage 6 contract; see notification_system_design.md)."""
     t = (type_raw or "").strip().lower()
     if t == "placement":
         return 3
