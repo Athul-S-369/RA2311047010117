@@ -86,3 +86,12 @@ export async function fetchVehiclesPayload(
   const url = resolveUrl(options.url ?? process.env.VEHICLES_URL, "/vehicles");
   return fetchProtectedJson(log, "vehicles", url, options.authorizationHeader);
 }
+
+/** GET /notifications — protected (campus notifications evaluation API) */
+export async function fetchNotificationsPayload(
+  log: AppLogger,
+  options: FetchProtectedOptions & { url?: string }
+): Promise<unknown> {
+  const url = resolveUrl(options.url ?? process.env.NOTIFICATIONS_URL, "/notifications");
+  return fetchProtectedJson(log, "notifications", url, options.authorizationHeader);
+}

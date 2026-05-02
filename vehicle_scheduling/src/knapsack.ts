@@ -18,7 +18,8 @@ export interface KnapsackResult {
 
 /**
  * 0/1 knapsack: maximize sum of scores with sum of weights <= capacity.
- * Time O(n * capacity), space O(n * capacity). Suitable when capacity is bounded (e.g. daily mechanic minutes).
+ * Time O(n × capacity), space O(n × capacity). Capacity is in the same units as task weights
+ * (whole hours when API uses integers, else minutes) to stay tractable at scale.
  */
 export function maximizeOperationalImpact(
   tasks: MaintenanceTask[],
@@ -41,8 +42,16 @@ export function maximizeOperationalImpact(
   const n = tasks.length;
   const W = capacityUnits;
 
-  const cellCount = (n + 1) * (W + 1);
-  log.debug("Knapsack DP grid allocation", { rows: n + 1, cols: W + 1, cellCount });
+  const cellEstimate = (n + 1) * (W + 1);
+  if (cellEstimate > 80_000_000) {
+    log.warn("Knapsack DP is very large — may be slow or memory-heavy", {
+      cellEstimate,
+      taskCount: n,
+      capacityUnits: W,
+    });
+  }
+
+  log.debug("Knapsack DP grid allocation", { rows: n + 1, cols: W + 1, cellEstimate });
 
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(W + 1).fill(0));
   const take: boolean[][] = Array.from({ length: n + 1 }, () => new Array(W + 1).fill(false));

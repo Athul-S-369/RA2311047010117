@@ -1,5 +1,5 @@
 {
-  "name": "vehicle-maintence-scheduler",
+  "name": "vehicle-scheduling",
   "version": "1.0.0",
   "private": true,
   "description": "Vehicle maintenance scheduler microservice (knapsack + logging middleware)",

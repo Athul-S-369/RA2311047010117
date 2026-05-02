@@ -1,5 +1,5 @@
-# Legacy folder name (remove locally if empty; IDE may lock the path)
-vehicle_scheduling/
+# Legacy duplicate (evaluation deliverable lives in vehicle_scheduling/)
+vehicle_maintence_scheduler/
 
 # Dependencies (Node.js / TypeScript)
 node_modules/

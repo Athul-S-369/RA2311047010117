@@ -20,7 +20,7 @@ function requireAuthHeader(log: AppLogger): string {
 export function registerRoutes(app: Express, rootLogger: AppLogger): void {
   app.get("/health", (_req, res) => {
     rootLogger.info("Health check invoked");
-    res.json({ status: "ok", service: "vehicle-maintence-scheduler" });
+    res.json({ status: "ok", service: "vehicle-scheduling" });
   });
 
   /**
@@ -67,7 +67,7 @@ export function registerRoutes(app: Express, rootLogger: AppLogger): void {
       for (const depot of filtered) {
         const solution = maximizeOperationalImpact(
           depot.tasks,
-          depot.mechanicBudgetMinutes,
+          depot.knapsackCapacity,
           log.child({ depotKey: depot.depotKey })
         );
 

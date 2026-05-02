@@ -1,14 +1,18 @@
 import type { AppLogger } from "@affordmed/logging-middleware";
 import type { MaintenanceTask } from "./knapsack";
 
-/** Smallest time unit: minutes for integer knapsack (MechanicHours & Duration treated as hours × 60) */
 export const MINUTES_PER_HOUR = 60;
 
 export interface NormalizedDepot {
   depotKey: string;
   label: string;
-  mechanicBudgetMinutes: number;
+  /** Knapsack capacity in the same units as `MaintenanceTask.weightUnits` */
+  knapsackCapacity: number;
   tasks: MaintenanceTask[];
+}
+
+function nearlyInteger(x: number): boolean {
+  return Math.abs(x - Math.round(x)) < 1e-5;
 }
 
 function pickNumber(obj: Record<string, unknown>, keys: string[]): number | undefined {
@@ -29,7 +33,6 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
   return undefined;
 }
 
-/** Depot id from vehicle row (links vehicle to depot). */
 function pickVehicleDepotRef(vr: Record<string, unknown>): string | undefined {
   const n = pickNumber(vr, [
     "DepotID",
@@ -41,8 +44,7 @@ function pickVehicleDepotRef(vr: Record<string, unknown>): string | undefined {
     "depotID",
   ]);
   if (n !== undefined) return String(n);
-  const s = pickString(vr, ["DepotID", "DepotId", "depotId", "depot_id", "Depot", "depot"]);
-  return s;
+  return pickString(vr, ["DepotID", "DepotId", "depotId", "depot_id", "Depot", "depot"]);
 }
 
 function parseVehicleRow(
@@ -92,7 +94,6 @@ function parseVehicleRow(
     return null;
   }
 
-  const weightUnits = Math.max(1, Math.round(hours * MINUTES_PER_HOUR));
   const depotRef = pickVehicleDepotRef(vr);
 
   return {
@@ -101,9 +102,44 @@ function parseVehicleRow(
       id,
       durationHours: hours,
       score: Math.round(score),
-      weightUnits,
+      weightUnits: 0,
     },
   };
+}
+
+/**
+ * Set `weightUnits` on each task and return knapsack capacity, using whole hours when all
+ * values are integral (smaller DP table = faster at scale); otherwise minute granularity.
+ */
+export function assignKnapsackWeightsAndCapacity(
+  mechanicHours: number,
+  tasks: MaintenanceTask[],
+  log: AppLogger
+): number {
+  const useWholeHours =
+    nearlyInteger(mechanicHours) && tasks.length > 0 && tasks.every((t) => nearlyInteger(t.durationHours));
+
+  if (useWholeHours) {
+    const capacity = Math.max(0, Math.round(mechanicHours));
+    for (const t of tasks) {
+      t.weightUnits = Math.max(1, Math.round(t.durationHours));
+    }
+    log.info("Knapsack units: whole mechanic-hours", {
+      taskCount: tasks.length,
+      capacityHours: capacity,
+    });
+    return capacity;
+  }
+
+  const capacity = Math.max(0, Math.round(mechanicHours * MINUTES_PER_HOUR));
+  for (const t of tasks) {
+    t.weightUnits = Math.max(1, Math.round(t.durationHours * MINUTES_PER_HOUR));
+  }
+  log.info("Knapsack units: minutes (fractional hours in input)", {
+    taskCount: tasks.length,
+    capacityMinutes: capacity,
+  });
+  return capacity;
 }
 
 function extractDepotsArray(raw: unknown): unknown[] {
@@ -132,10 +168,10 @@ function extractVehiclesArray(raw: unknown): unknown[] {
 export interface DepotBudgetRow {
   depotKey: string;
   label: string;
-  mechanicBudgetMinutes: number;
+  mechanicHours: number;
 }
 
-/** Parse GET /depots payload: { depots: [{ ID, MechanicHours }, ...] } */
+/** Parse GET /depots: `{ "depots": [ { "ID", "MechanicHours" }, ... ] }` */
 export function normalizeDepotBudgets(raw: unknown, log: AppLogger): DepotBudgetRow[] {
   const list = extractDepotsArray(raw);
   log.info("Normalizing depot budgets", { depotRowCount: list.length });
@@ -170,22 +206,13 @@ export function normalizeDepotBudgets(raw: unknown, log: AppLogger): DepotBudget
       continue;
     }
 
-    const mechanicBudgetMinutes = Math.max(0, Math.round(mechanicHours * MINUTES_PER_HOUR));
-
-    log.info("Normalized depot budget", {
-      depotKey,
-      label,
-      mechanicHours,
-      mechanicBudgetMinutes,
-    });
-
-    out.push({ depotKey, label, mechanicBudgetMinutes });
+    log.info("Normalized depot budget row", { depotKey, label, mechanicHours });
+    out.push({ depotKey, label, mechanicHours });
   }
 
   return out;
 }
 
-/** Parse GET /vehicles payload rows into tasks + optional depot link. */
 export function normalizeVehicleTasks(raw: unknown, log: AppLogger): { depotRef?: string; task: MaintenanceTask }[] {
   const list = extractVehiclesArray(raw);
   log.info("Normalizing vehicle tasks", { vehicleRowCount: list.length });
@@ -212,7 +239,7 @@ function depotKeyMatches(ref: string | undefined, depotKey: string): boolean {
 }
 
 /**
- * Join depot budgets (depots API) with vehicle tasks (vehicles API). No DB, no hard-coded tasks.
+ * Join depot budgets (depots API) with vehicles (vehicles API). No DB, no hard-coded tasks.
  */
 export function mergeDepotsAndVehicles(
   depotsRaw: unknown,
@@ -244,31 +271,34 @@ export function mergeDepotsAndVehicles(
     let tasks: MaintenanceTask[];
 
     if (useDepotFilter) {
-      tasks = linked.filter((r) => depotKeyMatches(r.depotRef, b.depotKey)).map((r) => r.task);
+      tasks = linked.filter((r) => depotKeyMatches(r.depotRef, b.depotKey)).map((r) => ({ ...r.task }));
       if (tasks.length === 0 && budgets.length === 1 && unlinked.length > 0) {
-        tasks = unlinked.map((r) => r.task);
+        tasks = unlinked.map((r) => ({ ...r.task }));
         log.info("Sole depot: assigned vehicles without DepotID to that depot", { count: tasks.length });
       }
     } else if (budgets.length === 1) {
-      tasks = vehicleRows.map((r) => r.task);
+      tasks = vehicleRows.map((r) => ({ ...r.task }));
       log.info("Single depot: assigned all vehicles from vehicles API", { count: tasks.length });
     } else {
-      tasks = vehicleRows.map((r) => r.task);
+      tasks = vehicleRows.map((r) => ({ ...r.task }));
       log.warn(
         "Multiple depots but no DepotID on vehicles — each depot runs knapsack on the full vehicle list",
         { depotCount: budgets.length, vehicleCount: tasks.length }
       );
     }
 
-    log.info("Merged depot with vehicles from evaluation APIs", {
+    const knapsackCapacity = assignKnapsackWeightsAndCapacity(b.mechanicHours, tasks, log.child({ depotKey: b.depotKey }));
+
+    log.info("Merged depot with live evaluation API data", {
       depotKey: b.depotKey,
       taskCount: tasks.length,
+      knapsackCapacity,
     });
 
     out.push({
       depotKey: b.depotKey,
       label: b.label,
-      mechanicBudgetMinutes: b.mechanicBudgetMinutes,
+      knapsackCapacity,
       tasks,
     });
   }

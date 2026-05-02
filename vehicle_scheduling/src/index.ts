@@ -6,7 +6,7 @@ import {
 } from "@affordmed/logging-middleware";
 import { registerRoutes } from "./routes";
 
-const SERVICE_NAME = "vehicle-maintence-scheduler";
+const SERVICE_NAME = "vehicle-scheduling";
 const PORT = Number(process.env.PORT ?? "3000");
 
 const rootLogger = createWinstonLogger({
