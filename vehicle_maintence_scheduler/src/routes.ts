@@ -52,35 +52,33 @@ export function registerRoutes(app: Express, rootLogger: AppLogger): void {
         return res.status(404).json({ error: "Depot not found", depotId: depotFilter });
       }
 
-      const results = filtered.map((depot) => {
+      type VehicleRow = { TaskID: string; Duration: number; Impact: number };
+      const vehicles: VehicleRow[] = [];
+
+      for (const depot of filtered) {
         const solution = maximizeOperationalImpact(
           depot.tasks,
           depot.mechanicBudgetMinutes,
           log.child({ depotKey: depot.depotKey })
         );
 
-        return {
-          depotKey: depot.depotKey,
-          label: depot.label,
-          mechanicBudgetMinutes: depot.mechanicBudgetMinutes,
-          mechanicBudgetHours: Math.round((depot.mechanicBudgetMinutes / 60) * 1000) / 1000,
-          taskCount: depot.tasks.length,
-          selectedVehicleIds: solution.selectedTaskIds,
-          totalOperationalImpactScore: solution.totalScore,
-          totalServiceMinutes: solution.totalWeightUnits,
-          totalServiceHours: Math.round((solution.totalWeightUnits / 60) * 1000) / 1000,
-          remainingMechanicMinutes: depot.mechanicBudgetMinutes - solution.totalWeightUnits,
-        };
+        for (const taskId of solution.selectedTaskIds) {
+          const t = depot.tasks.find((x) => x.id === taskId);
+          if (!t) continue;
+          vehicles.push({
+            TaskID: t.id,
+            Duration: t.durationHours,
+            Impact: t.score,
+          });
+        }
+      }
+
+      log.info("Schedule computation completed — response vehicles built", {
+        depotCount: filtered.length,
+        selectedVehicleCount: vehicles.length,
       });
 
-      log.info("Schedule computation completed for all requested depots", {
-        depotCount: results.length,
-      });
-
-      res.json({
-        generatedAt: new Date().toISOString(),
-        depots: results,
-      });
+      res.status(200).json({ vehicles });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       log.error("Failed to compute optimal schedule", { message });

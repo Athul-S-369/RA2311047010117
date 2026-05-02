@@ -2,7 +2,9 @@ import type { AppLogger } from "@affordmed/logging-middleware";
 
 export interface MaintenanceTask {
   id: string;
-  /** Duration in discrete units (e.g. minutes) used as knapsack weight */
+  /** Duration as returned in API responses (typically mechanic-hours, whole or fractional) */
+  durationHours: number;
+  /** Duration in discrete units (minutes) used as knapsack weight */
   weightUnits: number;
   /** Operational impact / importance score */
   score: number;

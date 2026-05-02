@@ -91,10 +91,18 @@ export function normalizeDepotPayload(raw: unknown, log: AppLogger): NormalizedD
       const vr = v as Record<string, unknown>;
 
       const id =
-        pickString(vr, ["vehicleId", "id", "taskId", "uuid", "registrationNumber"]) ??
-        `${depotKey}-task-${j}`;
+        pickString(vr, [
+          "TaskID",
+          "taskId",
+          "vehicleId",
+          "id",
+          "uuid",
+          "registrationNumber",
+        ]) ?? `${depotKey}-task-${j}`;
 
       const score = pickNumber(vr, [
+        "Impact",
+        "impact",
         "operationalImpactScore",
         "importanceScore",
         "score",
@@ -103,6 +111,8 @@ export function normalizeDepotPayload(raw: unknown, log: AppLogger): NormalizedD
       ]);
 
       const hours = pickNumber(vr, [
+        "Duration",
+        "duration",
         "estimatedServiceDuration",
         "estimatedServiceDurationHours",
         "serviceDurationHours",
@@ -123,7 +133,12 @@ export function normalizeDepotPayload(raw: unknown, log: AppLogger): NormalizedD
       }
 
       const weightUnits = Math.max(1, Math.round(hours * MINUTES_PER_HOUR));
-      tasks.push({ id, score: Math.round(score), weightUnits });
+      tasks.push({
+        id,
+        durationHours: hours,
+        score: Math.round(score),
+        weightUnits,
+      });
     }
 
     const mechanicBudgetMinutes =
